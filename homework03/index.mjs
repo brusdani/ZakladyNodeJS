@@ -3,10 +3,14 @@ import fs from 'fs/promises'
 async function fileGenerator () {
     try {
         const data = await fs.readFile('instrukce.txt', 'utf8');
-        const number = parseInt(data.trim());
+        const number = Number(data.trim());
 
-        if (isNaN(number)) {
-            console.error("Error. Content of instrukce.txt isn't an integer");
+        if (!Number.isInteger(number) || number < 0) {
+            console.error("Error: instrukce.txt must contain a non-negative integer");
+            return;
+        }
+        if (number > 100) {
+            console.error("Too many files requested");
             return;
         }
         console.log(`Creating ${number + 1} files`);
