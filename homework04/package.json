@@ -8,5 +8,6 @@
     "start": "node --watch index.js"
   },
   "author": "Daniel Brus",
-  "license": "ISC"
+  "license": "ISC",
+  "type": "module"
 }

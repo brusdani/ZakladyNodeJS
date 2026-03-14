@@ -1,6 +1,6 @@
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
+import http from 'http';
+import fs from 'fs/promises';
+import path from 'path';
 
 const PORT = 3000;
 
@@ -16,37 +16,41 @@ const mimeTypes = {
     '.txt': 'text/plain'
 };
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
     let filePath;
 
     if (req.url === '/') {
-        filePath = path.join(__dirname, 'index.html');
+        filePath = path.join(import.meta.dirname, 'index.html');
     } else {
-
-        filePath = path.join(__dirname, 'public', req.url);
+        filePath = path.join(import.meta.dirname, 'public', req.url);
     }
 
     const extname = String(path.extname(filePath)).toLowerCase();
     const contentType = mimeTypes[extname];
 
-    fs.readFile(filePath, (error, content) => {
-        if (error) {
-            if (error.code === 'ENOENT') {
-                fs.readFile(path.join(__dirname, '404.html'), (err404, content404) => {
-                    res.writeHead(404, { 'Content-Type': 'text/html' });
-                    res.end(content404 || '404 Not Found', 'utf-8');
-                });
-            } else {
-                res.writeHead(500);
-                res.end(`Server Error: ${error.code}`);
+    try {
+        const content = await fs.readFile(filePath);
+        res.writeHead(200, { 'Content-Type': contentType });
+        res.end(content, 'utf-8');
+
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            try {
+                const content404 = await fs.readFile(path.join(import.meta.dirname, '404.html'));
+                res.writeHead(404, { 'Content-Type': 'text/html' });
+                res.end(content404, 'utf-8');
+            } catch (err404) {
+                res.writeHead(404, { 'Content-Type': 'text/plain' });
+                res.end('404 Not Found');
             }
         } else {
-            res.writeHead(200, { 'Content-Type': contentType });
-            res.end(content, 'utf-8');
+            res.writeHead(500);
+            res.end(`Server Error: ${error.code}`);
         }
-    });
+    }
 });
 
 server.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
+    console.log(`Root directory: ${import.meta.dirname}`);
 });
