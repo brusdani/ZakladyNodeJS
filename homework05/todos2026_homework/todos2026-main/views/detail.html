@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Task detail</title>
+</head>
+<body>
+<a href="/"> Back to main list</a>
+<hr/>
+
+<h1><%= todo.title %></h1>
+<p>
+    Status: <strong><%= todo.done ? 'Done! :D ' : 'Pending :( ' %></strong>
+</p>
+
+<div>
+    <a href="/toggle-todo/<%= todo.id %>">
+        <%= todo.done ? 'Mark as pending' : 'Mark as done' %>
+    </a>
+
+    <% if (todo.done) { %>
+    <br><br>
+    <a href="/remove-todo/<%= todo.id %>" style="color: red;">
+        Remove task
+    </a>
+    <% } else { %>
+    <p><em>Task can't be deleted until it's done.</em></p>
+    <% } %>
+</div>
+
+<hr/>
+
+<h3>Change the Title</h3>
+<form method="post" action="/update-todo/<%= todo.id %>">
+    <input name="title" value="<%= todo.title %>" required/>
+    <button type="submit">Save new title</button>
+</form>
+</body>
+</html>
