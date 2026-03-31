@@ -11,6 +11,7 @@ const db = drizzle({
 })
 
 const app = new Hono()
+const allowedPriorities = ['low', 'normal', 'high']
 
 app.get(async (c, next) => {
     console.log(c.req.method, c.req.url)
@@ -36,7 +37,7 @@ app.get('/todo/:id', async (c, next) => {
 
     if (!todo) return await next()
 
-    const html = ejs.renderFile('views/todo-detail.html', {
+    const html = await ejs.renderFile('views/todo-detail.html', {
         todo,
     })
 
@@ -47,7 +48,11 @@ app.post('/add-todo', async (c) => {
     const body = await c.req.formData()
     const title = body.get('title')
     //homework06 changes
-    const priority = body.get('priority') || 'normal'
+    let priority = body.get('priority')
+
+    if (!allowedPriorities.includes(priority)) {
+        priority = 'normal'
+    }
 
     await db.insert(todosTable).values({
         title,
@@ -87,7 +92,7 @@ app.post('/update-todo/:id', async (c) => {
     if (title && title.trim() !== '') {
         updateData.title = title
     }
-    if (priority) {
+    if (priority && allowedPriorities.includes(priority)) {
         updateData.priority = priority
     }
     if (Object.keys(updateData).length > 0) {
