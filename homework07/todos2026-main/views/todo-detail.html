@@ -1,72 +1,41 @@
 <!doctype html>
 <html lang="cs">
-  <head>
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title><%= todo.title %> – Todo detail</title>
-  </head>
-  <body>
-    <p><a href="/">&larr; Zpět na seznam</a></p>
+</head>
+<body>
+<p><a href="/">&larr; Zpět na seznam</a></p>
 
-    <h1>
-      <% if (todo.done) { %>
-      <del><%= todo.title %></del>
-      <% } else { %> <%= todo.title %> <% } %>
-    </h1>
+<div id="todo-detail-content" data-id="<%= todo.id %>">
+    <%- include('_todo-detail.html', { todo, utils }) %>
+</div>
 
-    <table border="1" cellpadding="6" cellspacing="0">
-      <tr>
-        <th>ID</th>
-        <td><%= todo.id %></td>
-      </tr>
-      <tr>
-        <th>Název</th>
-        <td><%= todo.title %></td>
-      </tr>
-      <tr>
-        <th>Stav</th>
-        <td>
-          <% if (todo.done) { %>
-          <strong>&#10003; Hotovo</strong>
-          <% } else { %>
-          <em>&#8230; Čeká na splnění</em>
-          <% } %>
-        </td>
-      </tr>
-      <tr>
-        <th>Priorita</th>
-        <td><%= utils.formatPriority(todo.priority) %></td>
-      </tr>
-    </table>
+<script>
+    const container = document.getElementById('todo-detail-content');
+    const todoId = parseInt(container.getAttribute('data-id'));
 
-    <br />
+    const ws = new WebSocket(`ws://localhost:3000/ws`);
 
-    <% if (todo.done) { %>
-    <a href="/toggle-todo/<%= todo.id %>">&#8617; Označit jako nehotové</a>
-    &nbsp;
-    <a href="/remove-todo/<%= todo.id %>">&#10007; Odstranit úkol</a>
-    <% } else { %>
-    <a href="/toggle-todo/<%= todo.id %>">&#10003; Označit jako hotové</a>
-    <% } %>
+    ws.addEventListener('message', (ev) => {
+        const json = JSON.parse(ev.data);
 
-    <hr />
-
-    <fieldset>
-      <legend><strong>Upravit název úkolu</strong></legend>
-      <form method="post" action="/update-todo/<%= todo.id %>">
-        <label for="title">Nový název:</label>
-        <br />
-        <input id="title" name="title" size="40" value="<%= todo.title %>" />
-        <br />
-        <label>Priorita:</label>
-        <br />
-        <select name="priority">
-          <option value="low" <%= todo.priority === 'low' ? 'selected' : '' %>>Nízká</option>
-          <option value="medium" <%= todo.priority === 'medium' ? 'selected' : '' %>>Střední</option>
-          <option value="high" <%= todo.priority === 'high' ? 'selected' : '' %>>Vysoká</option>
-        </select>
-        <button type="submit">&#10003; Uložit</button>
-      </form>
-    </fieldset>
-  </body>
+        // Reacting only for todo-detail
+        if (json.type === 'todo-detail' && json.id === todoId) {
+            if (json.deleted) {
+                container.innerHTML = `
+                    <div style="background: #fee; padding: 20px; border: 1px solid red;">
+                        <h2>Varování</h2>
+                        <p>Tento úkol byl právě smazán jiným uživatelem.</p>
+                        <a href="/">&larr; Zpět na seznam</a>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = json.html;
+            }
+        }
+    });
+</script>
+</body>
 </html>

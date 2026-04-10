@@ -1,25 +1,25 @@
-import { Hono } from 'hono'
-import { serve } from '@hono/node-server'
+import {Hono} from 'hono'
+import {serve} from '@hono/node-server'
 import ejs from 'ejs'
-import { drizzle } from 'drizzle-orm/libsql'
-import { todosTable } from './src/schema.js'
-import { eq } from 'drizzle-orm'
-import { createNodeWebSocket } from '@hono/node-ws'
-import { WSContext } from 'hono/ws'
+import {drizzle} from 'drizzle-orm/libsql'
+import {todosTable} from './src/schema.js'
+import {eq} from 'drizzle-orm'
+import {createNodeWebSocket} from '@hono/node-ws'
+import {WSContext} from 'hono/ws'
 
 const db = drizzle({
-  connection: 'file:db.sqlite',
-  logger: true,
+    connection: 'file:db.sqlite',
+    logger: true,
 })
 
 const app = new Hono()
 
-const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app })
+const {injectWebSocket, upgradeWebSocket} = createNodeWebSocket({app})
 
 app.get(async (c, next) => {
-  console.log(c.req.method, c.req.url)
+    console.log(c.req.method, c.req.url)
 
-  await next()
+    await next()
 })
 
 /**
@@ -28,149 +28,188 @@ app.get(async (c, next) => {
 let webSockets = new Set()
 
 app.get(
-  '/ws',
-  upgradeWebSocket((c) => ({
-    onOpen: (evt, ws) => {
-      webSockets.add(ws)
-      console.log('open web sockets:', webSockets.size)
-    },
-    onMessage: () => {
-      console.log('message')
-    },
-    onClose: (evt, ws) => {
-      console.log('close')
-      webSockets.delete(ws)
-    },
-  })),
+    '/ws',
+    upgradeWebSocket((c) => ({
+        onOpen: (evt, ws) => {
+            webSockets.add(ws)
+            console.log('open web sockets:', webSockets.size)
+        },
+        onMessage: () => {
+            console.log('message')
+        },
+        onClose: (evt, ws) => {
+            console.log('close')
+            webSockets.delete(ws)
+        },
+    })),
 )
 
 app.get('/', async (c) => {
-  const todos = await db.select().from(todosTable).all()
+    const todos = await db.select().from(todosTable).all()
 
-  const html = await ejs.renderFile('views/index.html', {
-    name: 'Todos',
-    todos,
-    utils,
-  })
+    const html = await ejs.renderFile('views/index.html', {
+        name: 'Todos',
+        todos,
+        utils,
+    })
 
-  return c.html(html)
+    return c.html(html)
 })
 
 app.get('/todo/:id', async (c, next) => {
-  const id = Number(c.req.param('id'))
+    const id = Number(c.req.param('id'))
 
-  const todo = await db.select().from(todosTable).where(eq(todosTable.id, id)).get()
+    const todo = await db.select().from(todosTable).where(eq(todosTable.id, id)).get()
 
-  if (!todo) return await next()
+    if (!todo) return await next()
 
-  const html = ejs.renderFile('views/todo-detail.html', {
-    todo,
-    utils,
-  })
+    const html = ejs.renderFile('views/todo-detail.html', {
+        todo,
+        utils,
+    })
 
-  return c.html(html)
+    return c.html(html)
 })
 
 app.post('/add-todo', async (c) => {
-  const body = await c.req.formData()
-  const title = body.get('title')
-  const priority = body.get('priority')
+    const body = await c.req.formData()
+    const title = body.get('title')
+    const priority = body.get('priority')
 
-  await db.insert(todosTable).values({
-    title,
-    priority,
-    done: false,
-  })
+    await db.insert(todosTable).values({
+        title,
+        priority,
+        done: false,
+    })
 
-  sendTodosToAllWebsockets()
+    sendTodosToAllWebsockets()
 
-  return c.redirect('/')
+    return c.redirect('/')
 })
 
 app.get('/remove-todo/:id', async (c) => {
-  const id = Number(c.req.param('id'))
+    const id = Number(c.req.param('id'))
 
-  await db.delete(todosTable).where(eq(todosTable.id, id))
+    await db.delete(todosTable).where(eq(todosTable.id, id))
 
-  sendTodosToAllWebsockets()
+    sendTodosToAllWebsockets()
+    //homework07 - calling newly created function
+    sendTodoDetailToWebsockets(id, true);
 
-  return c.redirect('/')
+
+    return c.redirect('/')
 })
 
 app.get('/toggle-todo/:id', async (c) => {
-  const id = Number(c.req.param('id'))
+    const id = Number(c.req.param('id'))
 
-  const todo = await db.select().from(todosTable).where(eq(todosTable.id, id)).get()
+    const todo = await db.select().from(todosTable).where(eq(todosTable.id, id)).get()
 
-  await db.update(todosTable).set({ done: !todo.done }).where(eq(todosTable.id, id))
+    await db.update(todosTable).set({done: !todo.done}).where(eq(todosTable.id, id))
 
-  sendTodosToAllWebsockets()
+    sendTodosToAllWebsockets()
+    //Homework07 change
+    sendTodoDetailToWebsockets(id);
 
-  return redirectBack(c, '/')
+    return redirectBack(c, '/')
 })
 
 const sendTodosToAllWebsockets = async () => {
-  try {
-    const todos = await db.select().from(todosTable).all()
+    try {
+        const todos = await db.select().from(todosTable).all()
 
-    const html = await ejs.renderFile('views/_todos.html', {
-      todos,
-      utils,
-    })
+        const html = await ejs.renderFile('views/_todos.html', {
+            todos,
+            utils,
+        })
 
-    for (const webSocket of webSockets) {
-      webSocket.send(
-        JSON.stringify({
-          type: 'todos',
-          html,
-        }),
-      )
+        for (const webSocket of webSockets) {
+            webSocket.send(
+                JSON.stringify({
+                    type: 'todos',
+                    html,
+                }),
+            )
+        }
+    } catch (e) {
+        console.error(e)
     }
-  } catch (e) {
-    console.error(e)
-  }
 }
 
+/**
+ * Homework 07 part
+ * Helper function for sending details
+ * @param {number} id
+ * @param {boolean} deleted - if this is true, we send info about deletion
+ */
+const sendTodoDetailToWebsockets = async (id, deleted = false) => {
+    try {
+        let html = '';
+        if (!deleted) {
+            const todo = await db.select().from(todosTable).where(eq(todosTable.id, id)).get();
+            if (!todo) return;
+
+            html = await ejs.renderFile('views/_todo-detail.html', {todo, utils});
+        }
+
+        const payload = JSON.stringify({
+            type: 'todo-detail',
+            id: id,
+            deleted: deleted,
+            html: html
+        });
+
+        for (const ws of webSockets) {
+            ws.send(payload);
+        }
+    } catch (e) {
+        console.error('WS Detail Error:', e);
+    }
+};
+
 app.post('/update-todo/:id', async (c) => {
-  const id = Number(c.req.param('id'))
-  const body = await c.req.formData()
-  const title = body.get('title')
-  const priority = body.get('priority')
+    const id = Number(c.req.param('id'))
+    const body = await c.req.formData()
+    const title = body.get('title')
+    const priority = body.get('priority')
 
-  await db.update(todosTable).set({ title, priority }).where(eq(todosTable.id, id))
+    await db.update(todosTable).set({title, priority}).where(eq(todosTable.id, id))
 
-  return redirectBack(c, '/')
+    sendTodosToAllWebsockets();
+    sendTodoDetailToWebsockets(id);
+
+    return redirectBack(c, '/')
 })
 
 app.notFound(async (c) => {
-  const html = await ejs.renderFile('views/404.html')
+    const html = await ejs.renderFile('views/404.html')
 
-  c.status(404)
+    c.status(404)
 
-  return c.html(html)
+    return c.html(html)
 })
 
 const server = serve(app, (info) => {
-  console.log(`Server started on http://localhost:${info.port}`)
+    console.log(`Server started on http://localhost:${info.port}`)
 })
 
 injectWebSocket(server)
 
 const redirectBack = (c, fallbackUrl) => {
-  const referer = c.req.header('Referer')
-  return c.redirect(referer || fallbackUrl)
+    const referer = c.req.header('Referer')
+    return c.redirect(referer || fallbackUrl)
 }
 
 const utils = {
-  formatPriority: (priority) => {
-    if (priority === 'low') {
-      return 'Nízká'
-    } else if (priority === 'medium') {
-      return 'Střední'
-    } else if (priority === 'high') {
-      return 'Vysoká'
-    } else {
-      return priority
-    }
-  },
+    formatPriority: (priority) => {
+        if (priority === 'low') {
+            return 'Nízká'
+        } else if (priority === 'medium') {
+            return 'Střední'
+        } else if (priority === 'high') {
+            return 'Vysoká'
+        } else {
+            return priority
+        }
+    },
 }
