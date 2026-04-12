@@ -16,9 +16,17 @@
     const container = document.getElementById('todo-detail-content');
     const todoId = parseInt(container.getAttribute('data-id'));
 
+    let isNavigating = false;
+
+    window.addEventListener('beforeunload', () => {
+        isNavigating = true;
+    });
+
     const ws = new WebSocket(`ws://localhost:3000/ws`);
 
     ws.addEventListener('message', (ev) => {
+        if (isNavigating) return;
+
         const json = JSON.parse(ev.data);
 
         // Reacting only for todo-detail
